@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exercise System</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.0/codemirror.min.css">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 40px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+            width: 400px;
+            text-align: center;
+        }
+        h2 {
+            margin-bottom: 20px;
+            color: #007bff;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #007bff;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border 0.3s;
+        }
+        input:focus, textarea:focus, select:focus {
+            border-color: #00aaff;
+            outline: none;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .forgot-password, .toggle-link {
+            color: #007bff;
+            text-decoration: underline;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+        .message {
+            margin-top: 15px;
+            font-size: 14px;
+            color: red;
+        }
+        .exercises-container {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        .exercise-card {
+            background: #e9f7ff;
+            border: 1px solid #007bff;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+        .exercise-card:hover {
+            transform: scale(1.02);
+        }
+        .exercise-container {
+            display: none;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        .CodeMirror { border: 1px solid #007bff; height: auto; }
+        .timer {
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        #output {
+            margin-top: 15px;
+            padding: 10px;
+            background: #e7ffe7;
+            border: 1px solid #28a745;
+            border-radius: 5px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="container" id="login-container">
+            <h2>Login</h2>
+            <form id="loginForm" onsubmit="return handleLogin(event)">
+                <input type="text" id="username" placeholder="Username/Email" required aria-label="Username or Email">
+                <input type="password" id="password" placeholder="Password" required aria-label="Password">
+                <button type="submit">Login</button>
+            </form>
+            <a href="#" id="forgotPassword" class="forgot-password">Forgot password?</a>
+            <div id="message" class="message"></div>
+            <div class="toggle-link" onclick="toggleRegister()">Don't have an account? Create an account</div>
+        </div>
+
+        <div class="container" id="register-container" style="display: none;">
+            <h2>Create Account</h2>
+            <form id="registerForm" onsubmit="return handleRegister(event)">
+                <input type="text" id="newUsername" placeholder="Username" required aria-label="Username">
+                <input type="email" id="newEmail" placeholder="Email" required aria-label="Email">
+                <input type="password" id="newPassword" placeholder="Password" required aria-label="Password">
+                <button type="submit">Create Account</button>
+            </form>
+            <div class="toggle-link" onclick="toggleRegister()">Already have an account? Login</div>
+            <div id="registerMessage" class="message"></div>
+        </div>
+
+        <div class="dashboard-container" id="dashboard-container" style="display: none;">
+            <h2>Exercises</h2>
+            <input type="text" id="searchInput" placeholder="Search exercises..." oninput="filterExercises()">
+            <div id="exercises" class="exercises-container"></div>
+            <button onclick="logout()">Back to Login</button>
+        </div>
+
+        <div class="exercise-container" id="exercise-container" style="display: none;">
+            <h2 id="exercise-title"></h2>
+            <select id="languageSelect" onchange="changeLanguage()">
+                <option value="C">C</option>
+                <option value="Java">Java</option>
+                <option value="Python">Python</option>
+            </select>
+            <div id="code-editor"></div>
+            <div class="timer">Time spent: <span id="time">0:00</span></div>
+            <button onclick="runCode()">Run Code</button>
+            <button onclick="submitCode()">Submit Exercise</button>
+            <div id="output"></div>
+            <button onclick="backToDashboard()">Back</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.0/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.0/mode/clike/clike.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.0/mode/python/python.min.js"></script>
+    <script>
+        const exercises = [
+            { id: 1, title: "Exercise 1", description: "Find prime numbers", language: "C" },
+            { id: 2, title: "Exercise 2", description: "Discrete Mathematics", language: "Python" },
+            { id: 3, title: "Exercise 3", description: "Data Structures", language: "C" },
+            { id: 4, title: "Exercise 4", description: "Web Programming", language: "Python" },
+        ];
+
+        let editor;
+        let timerInterval;
+        let startTime;
+
+        function validateEmail(email) {
+            const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return re.test(String(email).toLowerCase());
+        }
+
+        function handleLogin(event) {
+            event.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const message = document.getElementById('message');
+
+            if (username && password) {
+                document.getElementById('login-container').style.display = 'none';
+                document.getElementById('dashboard-container').style.display = 'block';
+                displayExercises();
+            } else {
+                message.textContent = "Incorrect username or password.";
+            }
+        }
+
+        function handleRegister(event) {
+            event.preventDefault();
+            const newUsername = document.getElementById('newUsername').value;
+            const newEmail = document.getElementById('newEmail').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const registerMessage = document.getElementById('registerMessage');
+
+            if (!validateEmail(newEmail)) {
+                registerMessage.textContent = "Invalid email.";
+                return;
+            }
+
+            if (newUsername && newEmail && newPassword) {
+                registerMessage.textContent = "Account created successfully!";
+                document.getElementById('registerForm').reset();
+            } else {
+                registerMessage.textContent = "Please fill in all fields.";
+            }
+        }
+
+        function toggleRegister() {
+            const loginContainer = document.getElementById('login-container');
+            const registerContainer = document.getElementById('register-container');
+            loginContainer.style.display = loginContainer.style.display === 'none' ? 'block' : 'none';
+            registerContainer.style.display = registerContainer.style.display === 'none' ? 'block' : 'none';
+            document.getElementById('message').textContent = '';
+            document.getElementById('registerMessage').textContent = '';
+        }
+
+        document.getElementById('forgotPassword').addEventListener('click', function(event) {
+            event.preventDefault();
+            alert("Forgot password feature is not implemented yet.");
+        });
+
+        function displayExercises() {
+            const exercisesContainer = document.getElementById('exercises');
+            exercisesContainer.innerHTML = '';
+            exercises.forEach(exercise => {
+                const exerciseCard = document.createElement('div');
+                exerciseCard.classList.add('exercise-card');
+                exerciseCard.innerHTML = `
+                    <strong>${exercise.title}</strong>
+                    <p>${exercise.description}</p>
+                    <button onclick="selectExercise(${exercise.id})">Select Exercise</button>
+                `;
+                exercisesContainer.appendChild(exerciseCard);
+            });
+        }
+
+        function filterExercises() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const filteredExercises = exercises.filter(ex => ex.title.toLowerCase().includes(query));
+            const exercisesContainer = document.getElementById('exercises');
+            exercisesContainer.innerHTML = '';
+            filteredExercises.forEach(exercise => {
+                const exerciseCard = document.createElement('div');
+                exerciseCard.classList.add('exercise-card');
+                exerciseCard.innerHTML = `
+                    <strong>${exercise.title}</strong>
+                    <p>${exercise.description}</p>
+                    <button onclick="selectExercise(${exercise.id})">Select Exercise</button>
+                `;
+                exercisesContainer.appendChild(exerciseCard);
+            });
+        }
+
+        function selectExercise(id) {
+            const exercise = exercises.find(ex => ex.id === id);
+            document.getElementById('exercise-title').innerText = exercise.title;
+            document.getElementById('dashboard-container').style.display = 'none';
+            document.getElementById('exercise-container').style.display = 'block';
+
+            editor = CodeMirror(document.getElementById('code-editor'), {
+                mode: exercise.language === "C" ? "text/x-csrc" : "text/x-python",
+                lineNumbers: true,
+                value: `// Write your code here...\n`
+            });
+
+            startTimer();
+        }
+
+        function startTimer() {
+            startTime = Date.now();
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+
+        function updateTimer() {
+            const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(elapsedTime / 60);
+            const seconds = elapsedTime % 60;
+            document.getElementById('time').innerText = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+        }
+
+        function changeLanguage() {
+            const selectedLanguage = document.getElementById('languageSelect').value;
+            editor.setOption("mode", selectedLanguage === "C" ? "text/x-csrc" : "text/x-python");
+        }
+
+        function runCode() {
+            const code = editor.getValue();
+            document.getElementById('output').innerText = "Code executed successfully!"; // Placeholder
+            document.getElementById('output').style.display = 'block';
+        }
+
+        function submitCode() {
+            clearInterval(timerInterval);
+            const code = editor.getValue();
+            const totalTime = Math.floor((Date.now() - startTime) / 1000);
+            alert(`Exercise submitted with code:\n${code}\nTime taken: ${Math.floor(totalTime / 60)} minutes ${totalTime % 60} seconds`);
+            backToDashboard();
+        }
+
+        function backToDashboard() {
+            document.getElementById('exercise-container').style.display = 'none';
+            document.getElementById('dashboard-container').style.display = 'block';
+            editor.setValue('');
+            document.getElementById('output').innerText = '';
+            document.getElementById('time').innerText = '0:00';
+            clearInterval(timerInterval);
+            document.getElementById('output').style.display = 'none';
+        }
+
+        function logout() {
+            document.getElementById('login-container').style.display = 'block';
+            document.getElementById('dashboard-container').style.display = 'none';
+            document.getElementById('exercise-container').style.display = 'none';
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            clearInterval(timerInterval);
+        }
+
+        displayExercises();
+    </script>
+</body>
+</html>
